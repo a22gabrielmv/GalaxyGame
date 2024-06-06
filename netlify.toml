@@ -1,2 +1,7 @@
 [build]
-    functions = "functions"
+  functions = "functions"
+
+[[redirects]]
+  from = "/gamestart"
+  to = "/gamestart.html"
+  status = 200

@@ -1,0 +1,63 @@
+// Execute these commands on the visual studio terminal
+
+npm init -y
+
+npm install express mongodb cors
+
+node server.js
+
+// Now with live server extension open gamestart.html
+
+
+
+
+
+
+function moveAndDrawReapers() {
+    reaperCtx.clearRect(0, 0, reaperCanvas.width, reaperCanvas.height);
+    
+    reapers.forEach((reaper, index) => {
+        if (!reaperStunned[index]) {
+            const dx = spaceship.x - reaper.x;
+            const dy = spaceship.y - reaper.y;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+
+            if (distance > reaper.speed) {
+                const angle = Math.atan2(dy, dx);
+                const vx = Math.cos(angle) * reaper.speed;
+                const vy = Math.sin(angle) * reaper.speed;
+
+                reaper.x += vx;
+                reaper.y += vy;
+            } else {
+                reaper.x = spaceship.x;
+                reaper.y = spaceship.y;
+            }
+
+            const angleToShip = Math.atan2(dy, dx);
+            const reaperImg = angleToShip > Math.PI / 2 || angleToShip < -Math.PI / 2 ? reaperImgLeft : reaperImgRight;
+
+            reaperCtx.save();
+            reaperCtx.translate(reaper.x, reaper.y);
+            reaperCtx.drawImage(reaperImg, -reaper.width / 2, -reaper.height / 2, reaper.width, reaper.height);
+            reaperCtx.restore();
+
+            // Update timer bar position
+            reaperTimers[index].bar.style.left = `${reaper.x}px`;
+            reaperTimers[index].bar.style.top = `${reaper.y + reaper.height / 2 + 10}px`;
+
+            if (distance < reaper.width) {
+                checkGameOver(index);
+            }
+        } else {
+            reaperTimers[index].bar.style.left = `${reaper.x}px`;
+            reaperTimers[index].bar.style.top = `${reaper.y + reaper.height / 2 + 10}px`;
+
+            reaperCtx.drawImage(reaper.img, reaper.x - reaper.width / 2, reaper.y - reaper.height / 2, reaper.width, reaper.height);
+        }
+    });
+
+    if (!gameOver) {
+        requestAnimationFrame(moveAndDrawReapers);
+    }
+}

@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Galactic Map</title>
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: black;
+            cursor: none;
+        }
+        #galacticMap {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image: url('img/galaxy.png');
+            background-size: cover;
+        }
+        .system {
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            background-color: red;
+            border-radius: 50%;
+            cursor: none;
+            color: white;
+            font-size: 12px;
+            text-align: center;
+            line-height: 20px;
+            user-select: none;
+            animation: none;
+        }
+        .pulse {
+            animation: pulse 1.5s infinite alternate;
+        }
+        .blink {
+            animation: blink 1.5s infinite alternate;
+        }
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            100% { transform: scale(1.2); }
+        }
+        @keyframes blink {
+            0% { background-color: red; }
+            50% { background-color: white; }
+            100% { background-color: red; }
+        }
+        .system h1 {
+            position: absolute;
+            top: -55px;
+            left: 80%;
+            transform: translateX(-50%);
+            visibility: hidden;
+            font-weight: bold;
+            white-space: nowrap;
+        }
+        .system:hover h1 {
+            visibility: visible;
+        }
+        #mouseRing {
+            position: absolute;
+            width: 28px;
+            height: 28px;
+            border: 2px solid white;
+            border-radius: 50%;
+            pointer-events: none;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="galacticMap"></div>
+    <div id="mouseRing"></div>
+
+    <script>
+        async function loadSystems() {
+            try {
+                const response = await fetch('http://localhost:3000/systems');
+                const systems = await response.json();
+                const galacticMap = document.getElementById('galacticMap');
+
+                systems.forEach(system => {
+                    const systemDiv = document.createElement('div');
+                    systemDiv.className = 'system';
+                    systemDiv.style.top = `${system.top}px`;
+                    systemDiv.style.left = `${system.left}px`;
+                    systemDiv.setAttribute('onclick', `loadSystem('${system.id}')`);
+
+                    const h1 = document.createElement('h1');
+                    h1.textContent = system.name;
+
+                    systemDiv.appendChild(h1);
+                    galacticMap.appendChild(systemDiv);
+                });
+
+                addMouseMoveEvent();
+            } catch (error) {
+                console.error('Error loading systems:', error);
+            }
+        }
+
+        function loadSystem(system) {
+            window.location.href = system + '.html';
+        }
+
+        function addMouseMoveEvent() {
+            const mouseRing = document.getElementById('mouseRing');
+            const systems = document.querySelectorAll('.system');
+
+            document.addEventListener('mousemove', (event) => {
+                const mouseX = event.clientX;
+                const mouseY = event.clientY;
+                mouseRing.style.top = mouseY - 14 + 'px';
+                mouseRing.style.left = mouseX - 14 + 'px';
+
+                systems.forEach(system => {
+                    const systemRect = system.getBoundingClientRect();
+                    const isMouseOver = mouseX >= systemRect.left && mouseX <= systemRect.right && mouseY >= systemRect.top && mouseY <= systemRect.bottom;
+                    if (isMouseOver) {
+                        system.classList.remove('blink');
+                        system.classList.add('pulse');
+                    } else {
+                        system.classList.remove('pulse');
+                        system.classList.add('blink');
+                    }
+                });
+            });
+        }
+
+        window.onload = loadSystems;
+    </script>
+</body>
+
+</html>

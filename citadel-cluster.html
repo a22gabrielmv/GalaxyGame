@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Serpent Nebula</title>
+    <style>
+        body,
+        html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-image: url('img/serpent/nebula.jpg');
+            background-size: cover;
+            background-attachment: fixed;
+        }
+
+        canvas {
+            display: block;
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            border: 0;
+        }
+
+        #shopPanel {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: rgba(255, 255, 255, 0.9);
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+            display: none;
+            z-index: 9999;
+        }
+
+        #overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            display: none;
+            z-index: 999;
+        }
+
+        #closeButton {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+
+<body>
+    <canvas id="backgroundStars"></canvas>
+    <canvas id="solarSystem"></canvas>
+    <canvas id="spaceship"></canvas>
+
+    <div id="shopPanel">
+        <div id="closeButton">Close</div>
+        <h2>Citadel Shop</h2>
+        <ul id="shopItems">
+            <li data-upgrade="speed" data-cost="10">Increase Speed</li>
+            <li data-upgrade="shield" data-cost="15">Upgrade Shield</li>
+            <li data-upgrade="weapon" data-cost="20">Upgrade Weapon</li>
+            <li data-upgrade="stealth" data-cost="25">Upgrade Stealth</li>
+        </ul>
+        <p id="playerMaterials"></p>
+    </div>
+
+    <div id="overlay"></div>
+
+    <script>
+        // Función para establecer una cookie
+        function setCookie(name, value, days) {
+            const d = new Date();
+            d.setTime(d.getTime() + (days * 24 * 60 * 60 * 1000));
+            const expires = "expires=" + d.toUTCString();
+            document.cookie = name + "=" + JSON.stringify(value) + ";" + expires + ";path=/";
+        }
+
+        // Función para obtener una cookie
+        function getCookie(name) {
+            const nameEQ = name + "=";
+            const ca = document.cookie.split(';');
+            for (let i = 0; i < ca.length; i++) {
+                let c = ca[i];
+                while (c.charAt(0) == ' ') c = c.substring(1, c.length);
+                if (c.indexOf(nameEQ) == 0) return JSON.parse(c.substring(nameEQ.length, c.length));
+            }
+            return null;
+        }
+
+        // Guardar el estado de la nave espacial
+        function saveSpaceshipState() {
+            setCookie('spaceshipState', spaceship, 7); // Guarda el estado de la nave espacial por 7 días
+        }
+
+        // Recuperar el estado de la nave espacial al cargar la página
+        window.onload = () => {
+            const savedSpaceshipState = getCookie('spaceshipState');
+            if (savedSpaceshipState) {
+                spaceship = savedSpaceshipState;
+            }
+        };
+
+
+        ////////////////////////////////// PARAMETERS //////////////////////////////////
+
+        // ALL CANVAS //
+        const backgroundCanvas = document.getElementById('backgroundStars');
+        const backgroundCtx = backgroundCanvas.getContext('2d');
+        const solarSystemCanvas = document.getElementById('solarSystem');
+        const solarSystemCtx = solarSystemCanvas.getContext('2d');
+        const spaceshipCanvas = document.getElementById('spaceship');
+        const spaceshipCtx = spaceshipCanvas.getContext('2d');
+        const overlay = document.getElementById('overlay');
+        const windowWidth = window.innerWidth;
+        const windowHeight = window.innerHeight;
+
+        backgroundCanvas.width = solarSystemCanvas.width = spaceshipCanvas.width = windowWidth;
+        backgroundCanvas.height = solarSystemCanvas.height = spaceshipCanvas.height = windowHeight;
+
+        // SUN PLACEMENT //
+        const sun = {
+            x: solarSystemCanvas.width / 2,
+            y: solarSystemCanvas.height / 2,
+            texture: 'img/sol/sun.png',
+            radius: 0
+        };
+
+        const sunTexture = new Image();
+        sunTexture.src = sun.texture;
+        sunTexture.onload = drawSolarSystem;
+
+        // BACKGROUND STARS //
+        drawSpaceBackground();
+
+        // Variables globales para planets y planetTextures
+        let planets = [];
+        let planetTextures = {};
+        let originalSpeeds;
+
+        // Fetch planets from the server
+        fetch('http://localhost:3000/planets/citadel-cluster')
+            .then(response => response.json())
+            .then(data => {
+                planets = data.map(planet => ({
+                    ...planet
+                }));
+
+
+                planets.forEach(planet => {
+                    const texture = new Image();
+                    texture.src = planet.texture;
+                    planetTextures[planet.name] = texture;
+                });
+
+                originalSpeeds = planets.map(planet => planet.speed);
+
+            })
+            .catch(error => console.error('Error fetching planets:', error));
+
+
+
+        // SPACESHIP SETUP //
+        const spaceshipImgRight = new Image();
+        spaceshipImgRight.src = 'img/normandyDER.webp';
+
+        const spaceshipImgLeft = new Image();
+        spaceshipImgLeft.src = 'img/normandyIZQ.webp';
+
+        let spaceship = {
+            x: spaceshipCanvas.width / 1.17,
+            y: spaceshipCanvas.height / 2.3,
+            width: 50,
+            height: 30,
+            speed: 5,
+            shield: 0,
+            weapon: 0,
+            stealth: 0,
+            elementZero: 500,
+            iridium: 500,
+            platinum: 500,
+            palladium: 500,
+            upgrades: {
+                speed: 0,
+                shield: 0,
+                weapon: 0,
+                stealth: 0,
+            }
+        };
+
+        let isMouseDown = false;
+        let mouseX, mouseY;
+        let mouseIsOverPlanet = false;
+        let animationId;
+        let currentPlanet = null;
+
+        const spaceshipWidth = 50;
+        const spaceshipHeight = 20;
+
+        const projectiles = [];
+
+        // SPACESHIP FUNCTIONALITY //
+        spaceshipCanvas.addEventListener('mousedown', () => {
+            isMouseDown = true;
+        });
+
+        spaceshipCanvas.addEventListener('mouseup', () => {
+            isMouseDown = false;
+        });
+
+        spaceshipCanvas.addEventListener('mousemove', event => {
+            mouseX = event.clientX;
+            mouseY = event.clientY;
+        });
+
+        document.addEventListener('keydown', event => {
+            if (event.key === ' ' && mouseIsOverPlanet && currentPlanet) {
+                planets.forEach((planet, index) => {
+                    planet.speed = 0;
+                });
+                displayShop(currentPlanet);
+            }
+            if (event.key === 'f' && spaceship.weapon > 0) {
+                fireProjectile();
+            }
+        });
+
+        // SPACESHIP //
+        drawSpaceship();
+
+        ////////////////////////////////// FUNCTIONS //////////////////////////////////
+
+        // STAR BACKGROUND //
+        function drawSpaceBackground() {
+            const numStars = 1000;
+            const maxX = backgroundCanvas.width;
+            const maxY = backgroundCanvas.height;
+
+            backgroundCtx.fillStyle = 'white';
+
+            for (let i = 0; i < numStars; i++) {
+                const x = Math.random() * maxX;
+                const y = Math.random() * maxY;
+
+                backgroundCtx.fillRect(x, y, 1, 1);
+            }
+        }
+
+        // DRAW SYSTEM SUN AND PLANETS //
+        function drawSolarSystem() {
+            solarSystemCtx.clearRect(0, 0, solarSystemCanvas.width, solarSystemCanvas.height);
+
+            planets.forEach(planet => {
+                planet.angle += planet.speed;
+                const planetX = solarSystemCanvas.width / 2 + planet.distance * Math.cos(planet.angle);
+                const planetY = solarSystemCanvas.height / 2 + planet.distance * Math.sin(planet.angle);
+
+                solarSystemCtx.save();
+
+                solarSystemCtx.drawImage(planetTextures[planet.name], planetX - planet.radius, planetY - planet.radius, planet.radius * 2, planet.radius * 2);
+
+                solarSystemCtx.restore();
+
+                solarSystemCtx.fillStyle = mouseIsOverPlanet && spaceshipIsOverPlanet(planetX, planetY, planet.radius) ? 'red' : 'white';
+                if (planet.name == "Mass Relay") {
+                    solarSystemCtx.font = '14px Arial';
+                    solarSystemCtx.fillText(planet.name, planetX - 32, planetY - planet.radius + 13);
+                }
+                else {
+                    solarSystemCtx.font = '20px Arial';
+                    solarSystemCtx.fillText(planet.name, planetX - 42, planetY - planet.radius);
+                }
+            });
+
+            updateProjectiles();
+
+            animationId = requestAnimationFrame(drawSolarSystem);
+        }
+
+        // DRAW SPACESHIP //
+        function drawSpaceship() {
+            spaceshipCtx.clearRect(0, 0, spaceshipCanvas.width, spaceshipCanvas.height);
+
+            if (isMouseDown) {
+                const dx = mouseX - spaceship.x;
+                const dy = mouseY - spaceship.y;
+                const distanceToTarget = Math.sqrt(dx * dx + dy * dy);
+
+                if (distanceToTarget > spaceship.speed) {
+                    const angle = Math.atan2(dy, dx);
+                    const vx = Math.cos(angle) * spaceship.speed;
+                    const vy = Math.sin(angle) * spaceship.speed;
+                    spaceship.x += vx;
+                    spaceship.y += vy;
+                    spaceship.direction = vx >= 0 ? 'right' : 'left';
+                } else {
+                    isMouseDown = false;
+                }
+            }
+
+            mouseIsOverPlanet = false;
+            planets.forEach(planet => {
+                const dx = spaceship.x - sun.x - planet.distance * Math.cos(planet.angle);
+                const dy = spaceship.y - sun.y - planet.distance * Math.sin(planet.angle);
+                const distance = Math.sqrt(dx * dx + dy * dy);
+
+                if (distance < planet.radius) {
+                    mouseIsOverPlanet = true;
+                    currentPlanet = planet;
+                }
+            });
+
+            if (!mouseIsOverPlanet) {
+                solarSystemCtx.fillStyle = 'white';
+            }
+
+            const dx = mouseX - spaceship.x;
+            const dy = mouseY - spaceship.y;
+            const angleToMouse = Math.atan2(dy, dx);
+
+            const spaceshipImg = angleToMouse > Math.PI / 2 || angleToMouse < -Math.PI / 2 ? spaceshipImgLeft : spaceshipImgRight;
+
+            spaceshipCtx.save();
+            spaceshipCtx.translate(spaceship.x, spaceship.y);
+            spaceshipCtx.rotate(angleToMouse);
+            spaceshipCtx.drawImage(spaceshipImg, -spaceshipWidth / 2, -spaceshipHeight / 2, spaceshipWidth, spaceshipHeight);
+            spaceshipCtx.restore();
+
+            requestAnimationFrame(drawSpaceship);
+        }
+
+        // SPACESHIP-PLANET INTERACTION //
+        function spaceshipIsOverPlanet(planetX, planetY, planetRadius) {
+            const dx = spaceship.x - planetX;
+            const dy = spaceship.y - planetY;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+            return distance < planetRadius;
+        }
+
+        // Add the event listener outside of the displayShop function to ensure it's added only once
+        document.getElementById('shopItems').addEventListener('click', (event) => {
+            if (event.target.tagName === 'LI' && !event.target.classList.contains('max')) {
+                const upgrade = event.target.getAttribute('data-upgrade');
+                const cost = calculateUpgradeCost(upgrade);
+
+                if (canAffordUpgrade(upgrade, cost)) {
+                    applyUpgrade(upgrade, cost);
+                    updatePlayerMaterialsDisplay();
+                    updateShopItemsDisplay();
+                }
+            }
+        });
+
+
+        // SHOP MECHANICS //
+        function displayShop(planet) {
+            if (planet.name === 'Mass Relay') {
+                saveSpaceshipState();
+                window.location.href = 'galaxy.html';
+                return;
+            }
+
+            const shopPanel = document.getElementById('shopPanel');
+            shopPanel.style.display = 'block';
+            overlay.style.display = 'block';
+
+            const closeButton = document.getElementById('closeButton');
+            closeButton.addEventListener('click', () => {
+                shopPanel.style.display = 'none';
+                overlay.style.display = 'none';
+
+                planets.forEach((planet, index) => {
+                    planet.speed = originalSpeeds[index];
+                });
+            });
+
+            updatePlayerMaterialsDisplay();
+            updateShopItemsDisplay();
+        }
+
+        function updatePlayerMaterialsDisplay() {
+            playerMaterials.textContent = `Element Zero: ${spaceship.elementZero}, Iridium: ${spaceship.iridium}, Platinum: ${spaceship.platinum}, Palladium: ${spaceship.palladium}`;
+        }
+
+        function updateShopItemsDisplay() {
+            const shopItems = document.getElementById('shopItems');
+            const upgrades = Object.keys(spaceship.upgrades);
+
+            shopItems.innerHTML = '';
+            upgrades.forEach(upgrade => {
+                const listItem = document.createElement('li');
+                listItem.setAttribute('data-upgrade', upgrade);
+
+                if (spaceship.upgrades[upgrade] >= 3) {
+                    listItem.textContent = `${upgrade.charAt(0).toUpperCase() + upgrade.slice(1)}: max`;
+                    listItem.classList.add('max');
+                } else {
+                    const cost = calculateUpgradeCost(upgrade);
+                    listItem.textContent = `${upgrade.charAt(0).toUpperCase() + upgrade.slice(1)}: Primary (${upgradePrimaryMaterial(upgrade)}): ${cost.primaryAmount}, Secondary (${upgradeSecondaryMaterial(upgrade)}): ${cost.secondaryAmount}`;
+                }
+
+                shopItems.appendChild(listItem);
+            });
+        }
+
+        function calculateUpgradeCost(upgrade) {
+            const baseCosts = {
+                speed: { primary: 'iridium', primaryAmount: 50, secondary: 'elementZero', secondaryAmount: 20 },
+                shield: { primary: 'platinum', primaryAmount: 50, secondary: 'palladium', secondaryAmount: 20 },
+                weapon: { primary: 'elementZero', primaryAmount: 50, secondary: 'platinum', secondaryAmount: 20 },
+                stealth: { primary: 'palladium', primaryAmount: 50, secondary: 'iridium', secondaryAmount: 20 }
+            };
+
+            const upgradeLevel = spaceship.upgrades[upgrade];
+            const cost = {
+                primaryAmount: baseCosts[upgrade].primaryAmount * Math.pow(1.5, upgradeLevel),
+                secondaryAmount: baseCosts[upgrade].secondaryAmount * Math.pow(1.5, upgradeLevel)
+            };
+
+            return cost;
+        }
+
+        function canAffordUpgrade(upgrade, cost) {
+            const primaryMaterial = upgradePrimaryMaterial(upgrade);
+            const secondaryMaterial = upgradeSecondaryMaterial(upgrade);
+            return spaceship[primaryMaterial] >= cost.primaryAmount && spaceship[secondaryMaterial] >= cost.secondaryAmount;
+        }
+
+        function applyUpgrade(upgrade, cost) {
+            const primaryMaterial = upgradePrimaryMaterial(upgrade);
+            const secondaryMaterial = upgradeSecondaryMaterial(upgrade);
+
+            spaceship[primaryMaterial] -= cost.primaryAmount;
+            spaceship[secondaryMaterial] -= cost.secondaryAmount;
+            spaceship.upgrades[upgrade] += 1;
+
+            if (spaceship.upgrades[upgrade] > 3) {
+                return;
+            }
+
+            switch (upgrade) {
+                case 'speed':
+                    spaceship.speed += 2;
+                    break;
+                case 'shield':
+                    spaceship.shield += 1000;
+                    break;
+                case 'weapon':
+                    spaceship.weapon += 1;
+                    break;
+                case 'stealth':
+                    spaceship.stealth += 1000;
+                    break;
+            }
+        }
+
+        function upgradePrimaryMaterial(upgrade) {
+            const primaryMaterials = {
+                speed: 'iridium',
+                shield: 'platinum',
+                weapon: 'elementZero',
+                stealth: 'palladium',
+            };
+            return primaryMaterials[upgrade];
+        }
+
+        function upgradeSecondaryMaterial(upgrade) {
+            const secondaryMaterials = {
+                speed: 'elementZero',
+                shield: 'palladium',
+                weapon: 'platinum',
+                stealth: 'iridium',
+            };
+            return secondaryMaterials[upgrade];
+        }
+
+
+        // PROJECTILE IMAGE SETUP //
+        const projectileImg = new Image();
+        projectileImg.src = 'img/energy-ball.png';
+
+        // PROJECTILE LOGIC //
+        function fireProjectile() {
+            const projectileSpeed = 10 + spaceship.speed;
+            const angle = Math.atan2(mouseY - spaceship.y, mouseX - spaceship.x);
+            const projectile = {
+                x: spaceship.x,
+                y: spaceship.y,
+                vx: Math.cos(angle) * projectileSpeed,
+                vy: Math.sin(angle) * projectileSpeed,
+                width: 10,
+                height: 10,
+            };
+            projectiles.push(projectile);
+        }
+
+        function drawProjectiles() {
+            projectiles.forEach(projectile => {
+                solarSystemCtx.drawImage(projectileImg, projectile.x - projectile.width / 2, projectile.y - projectile.height / 2, projectile.width, projectile.height);
+            });
+        }
+
+        function updateProjectiles() {
+            projectiles.forEach((projectile, index) => {
+                projectile.x += projectile.vx;
+                projectile.y += projectile.vy;
+
+                // Remove the projectile if it goes off screen
+                if (projectile.x < 0 || projectile.x > windowWidth || projectile.y < 0 || projectile.y > windowHeight) {
+                    projectiles.splice(index, 1);
+                }
+            });
+
+            drawProjectiles();
+        }
+    </script>
+</body>
+
+</html>

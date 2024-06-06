@@ -1,0 +1,1117 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trebia Cluster</title>
+    <style>
+        body,
+        html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: black;
+        }
+
+        canvas {
+            display: block;
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            border: 0;
+        }
+
+        #planetInfoPanel {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: url("img/Scanning-Background.png") no-repeat center center;
+            background-size: cover;
+            padding: 20px;
+            border: 1px solid #ccc;
+            border-radius: 10px;
+            z-index: 1000;
+            width: 800px;
+            height: 400px;
+            color: white;
+        }
+
+        #overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 999;
+        }
+
+        #closeButton {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            cursor: pointer;
+            color: red;
+            background-color: black;
+        }
+
+        #resourcePanel {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            height: 100%;
+        }
+
+        #planetImage {
+            flex: 1;
+            max-width: 50%;
+            margin-right: 20px;
+        }
+
+        #scanResultsContainer {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            width: 90%;
+            text-align: center;
+        }
+
+        #scanResults {
+            flex: 2;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 100%;
+            border: 1px solid #ccc;
+            border-radius: 10px;
+            background-color: black;
+            padding-bottom: 10px;
+        }
+
+        
+        .resourceBar {
+            width: 80%;
+            margin: 5px 0;
+        }
+
+        .resourceTitle{
+            color: red;
+        }
+
+        #extractionProgressBarContainer {
+            width: 100%;
+            height: 10px;
+            background-color: #ccc;
+            margin-top: 10px;
+        }
+
+        #extractionProgressBar {
+            width: 0;
+            height: 100%;
+            background-color: #018E42;
+        }
+
+        #threatMeter {
+            position: fixed;
+            top: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 300px;
+            height: 30px;
+            background-color: #333;
+            border: 2px solid #fff;
+            z-index: 1000;
+        }
+
+        #threatMeterFill {
+            width: 0;
+            height: 100%;
+            background-color: red;
+        }
+
+        #reaperTimerBar {
+            position: absolute;
+            bottom: -10px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 50px;
+            height: 5px;
+            background-color: #333;
+            border: 1px solid #fff;
+            z-index: 999;
+        }
+
+        #reaperTimerFill {
+            width: 0;
+            height: 100%;
+            background-color: red;
+        }
+
+        .fade-out {
+            animation: fadeOut 1s forwards;
+        }
+
+        @keyframes fadeOut {
+            from {
+                opacity: 1;
+            }
+
+            to {
+                opacity: 0;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <canvas id="backgroundStars"></canvas>
+    <canvas id="solarSystem"></canvas>
+
+
+    <canvas id="spaceshipCanvas" style="position:absolute; left:0; top:0; z-index:998;"></canvas>
+
+    <canvas id="reaperCanvas" style="position:absolute; left:0; top:0; z-index:997;"></canvas>
+
+
+    <div id="planetInfoPanel">
+        <button id="closeButton">Close</button>
+        <div id="resourcePanel">
+            <img id="planetImage" src="" alt="Planet Image">
+            <div id="scanResultsContainer">
+                <div id="scanResults">
+                    <div class="resourceTitle"><h3>Planet</h3></div>
+                    <div class="resourceBar">Element Zero: <span id="elementZero">0</span></div>
+                    <div class="resourceBar">Iridium: <span id="iridium">0</span></div>
+                    <div class="resourceBar">Platinum: <span id="platinum">0</span></div>
+                    <div class="resourceBar">Palladium: <span id="palladium">0</span></div>
+                    <div class="resourceBar">Total Resources: <span id="totalResources">0</span></div>
+                </div>
+                <div id="scanResults">
+                    <div class="resourceTitle" ><h3>Spaceship</h3></div>
+                    <div class="resourceBar">Spaceship Element Zero: <span id="spaceshipElementZero">0</span></div>
+                    <div class="resourceBar">Spaceship Iridium: <span id="spaceshipIridium">0</span></div>
+                    <div class="resourceBar">Spaceship Platinum: <span id="spaceshipPlatinum">0</span></div>
+                    <div class="resourceBar">Spaceship Palladium: <span id="spaceshipPalladium">0</span></div>
+                </div>
+            </div>
+        </div>
+        <div id="extractionProgressBarContainer">
+            <div id="extractionProgressBar"></div>
+        </div>
+    </div>
+
+    <div id="overlay"></div>
+    <div id="threatMeter">
+        <div id="threatMeterFill"></div>
+    </div>
+
+
+    <div id="reaperTimerBar">
+        <div id="reaperTimerFill"></div>
+    </div>
+
+
+    <script>
+        ////////////////////////////////// PARAMETERS //////////////////////////////////
+
+        // ALL CANVAS //
+        const backgroundCanvas = document.getElementById('backgroundStars');
+        const backgroundCtx = backgroundCanvas.getContext('2d');
+        const solarSystemCanvas = document.getElementById('solarSystem');
+        const solarSystemCtx = solarSystemCanvas.getContext('2d');
+        const spaceshipCanvas = document.getElementById('spaceshipCanvas');
+        const spaceshipCtx = spaceshipCanvas.getContext('2d');
+        const overlay = document.getElementById('overlay');
+
+
+        const reaperCanvas = document.getElementById('reaperCanvas');
+        const reaperCtx = reaperCanvas.getContext('2d');
+
+
+
+        const windowWidth = window.innerWidth;
+        const windowHeight = window.innerHeight;
+
+        backgroundCanvas.width = solarSystemCanvas.width = spaceshipCanvas.width = reaperCanvas.width = windowWidth;
+        backgroundCanvas.height = solarSystemCanvas.height = spaceshipCanvas.height = reaperCanvas.height = windowHeight;
+
+
+
+        // BACKGROUND STARS AND METEORITES //
+        drawSpaceBackground();
+        generateFallingStars();
+
+
+
+
+
+        // SUN PLACEMENT //
+        const sun = {
+            x: solarSystemCanvas.width / 2,
+            y: solarSystemCanvas.height / 2,
+            texture: 'img/trebia/sun.png',
+            radius: 50
+        };
+
+        const sunTexture = new Image();
+        sunTexture.src = sun.texture;
+        sunTexture.onload = drawSolarSystem;
+
+
+
+        // Variables globales para planets y planetTextures
+        let planets = [];
+        let planetTextures = {};
+        let originalSpeeds;
+
+        // Función para establecer una cookie
+        function setCookie(name, value, days) {
+            const d = new Date();
+            d.setTime(d.getTime() + (days * 24 * 60 * 60 * 1000));
+            const expires = "expires=" + d.toUTCString();
+            document.cookie = name + "=" + JSON.stringify(value) + ";" + expires + ";path=/";
+        }
+
+        // Función para obtener una cookie
+        function getCookie(name) {
+            const nameEQ = name + "=";
+            const ca = document.cookie.split(';');
+            for (let i = 0; i < ca.length; i++) {
+                let c = ca[i];
+                while (c.charAt(0) == ' ') c = c.substring(1, c.length);
+                if (c.indexOf(nameEQ) == 0) return JSON.parse(c.substring(nameEQ.length, c.length));
+            }
+            return null;
+        }
+
+        // Guardar el estado del planeta
+        function savePlanetState(planet) {
+            planet.totalResources = planet.elementZero + planet.iridium + planet.platinum + planet.palladium;
+            const planetState = {
+                name: planet.name,
+                elementZero: planet.elementZero,
+                iridium: planet.iridium,
+                platinum: planet.platinum,
+                palladium: planet.palladium,
+                totalResources: planet.totalResources
+            };
+            setCookie(`planetState_${planet.name}`, planetState, 7); // Guarda el estado del planeta por 7 días
+        }
+
+        // Recuperar el estado de los planetas
+        function getSavedPlanets() {
+            return planets.map(planet => {
+                const savedState = getCookie(`planetState_${planet.name}`);
+                return savedState ? { ...planet, ...savedState } : planet;
+            });
+        }
+
+        // Guardar el estado de la nave espacial
+        function saveSpaceshipState() {
+            setCookie('spaceshipState', spaceship, 7); // Guarda el estado de la nave espacial por 7 días
+        }
+
+        // Recuperar el estado de la nave espacial al cargar la página
+        window.onload = () => {
+            const savedSpaceshipState = getCookie('spaceshipState');
+            if (savedSpaceshipState) {
+                spaceship = savedSpaceshipState;
+            }
+
+            // Fetch planets from the server
+            fetch('http://localhost:3000/planets/trebia-cluster')
+                .then(response => response.json())
+                .then(data => {
+                    planets = data.map(planet => ({
+                        ...planet,
+                        elementZero: getRandomNumber(100, 2000),
+                        iridium: getRandomNumber(1000, 10000),
+                        platinum: getRandomNumber(1000, 10000),
+                        palladium: getRandomNumber(1000, 10000),
+                    }));
+
+                    planets.forEach(planet => {
+                        if (planet.name !== 'Mass Relay') {
+                            planet.totalResources = planet.elementZero + planet.iridium + planet.platinum + planet.palladium;
+                        }
+                        else {
+                            planet.totalResources = 0;
+                        }
+                    });
+
+                    planets.forEach(planet => {
+                        const texture = new Image();
+                        texture.src = planet.texture;
+                        planetTextures[planet.name] = texture;
+                    });
+
+                    originalSpeeds = planets.map(planet => planet.speed);
+
+                    planets = getSavedPlanets();
+                })
+                .catch(error => console.error('Error fetching planets:', error));
+        };
+
+
+        // SPACESHIP SETUP //
+        const spaceshipImgRight = new Image();
+        spaceshipImgRight.src = 'img/normandyDER.webp';
+
+        const spaceshipImgLeft = new Image();
+        spaceshipImgLeft.src = 'img/normandyIZQ.webp';
+
+        let spaceship = {
+            x: spaceshipCanvas.width / 1.17,
+            y: spaceshipCanvas.height / 2.3,
+            width: 50,
+            height: 30,
+            speed: 5,
+            shield: 0,
+            weapon: 0,
+            stealth: 0,
+            elementZero: 500,
+            iridium: 500,
+            platinum: 500,
+            palladium: 500,
+            upgrades: {
+                speed: 0,
+                shield: 0,
+                weapon: 0,
+                stealth: 0,
+            }
+        };
+
+        let isMouseDown = false;
+        let mouseX, mouseY;
+        let mouseIsOverPlanet = false;
+        let animationId;
+        let currentPlanet = null;
+
+        const spaceshipWidth = 50;
+        const spaceshipHeight = 20;
+
+        let currentSpaceshipX = spaceship.x;
+        let currentSpaceshipY = spaceship.y;
+
+
+        const projectiles = [];
+
+
+
+
+        // SPACESHIP FUNCTIONALITY //
+        spaceshipCanvas.addEventListener('mousedown', () => {
+            isMouseDown = true;
+        });
+
+        spaceshipCanvas.addEventListener('mouseup', () => {
+            isMouseDown = false;
+        });
+
+        spaceshipCanvas.addEventListener('mousemove', event => {
+            mouseX = event.clientX;
+            mouseY = event.clientY;
+        });
+
+
+
+        document.addEventListener('keydown', event => {
+            if (event.key === 'c') {
+                bestPlanets();
+            }
+            if (event.key === ' ' && mouseIsOverPlanet && currentPlanet) {
+                planets.forEach((planet, index) => {
+                    planet.speed = 0;
+                });
+                displayPlanetInfo(currentPlanet);
+            }
+            if (event.key === 'c' && threatMeter < 100) {
+                increaseThreatMeter();
+            }
+            if (event.key === 'f' && spaceship.weapon > 0) {
+                fireProjectile();
+            }
+        });
+
+
+
+
+
+
+        // SPACESHIP //
+        drawSpaceship();
+
+
+
+
+
+
+
+
+
+
+
+
+
+        ////////////////////////////////// FUNCTIONS //////////////////////////////////
+
+        // RANDOM NUMBER //
+        function getRandomNumber(min, max) {
+            return Math.floor(Math.random() * (max - min + 1)) + min;
+        }
+
+
+        // STAR BACKGROUND //
+        function drawSpaceBackground() {
+            const numStars = 1000;
+            const maxX = backgroundCanvas.width;
+            const maxY = backgroundCanvas.height;
+
+            backgroundCtx.fillStyle = 'white';
+
+            for (let i = 0; i < numStars; i++) {
+                const x = Math.random() * maxX;
+                const y = Math.random() * maxY;
+
+                backgroundCtx.fillRect(x, y, 1, 1);
+            }
+        }
+
+
+
+
+        // GENERATE METEORITE QUANTITY AND SPEED //
+        function generateFallingStars() {
+            setInterval(() => {
+                const x = Math.random() * windowWidth;
+                const y = 0; // Start from the top
+                const speed = Math.random() * 2 + 2; // Random speed between 2 and 4
+                const angle = Math.random() * Math.PI / 4 + Math.PI / 4; // Random angle between 45 and 90 degrees
+                const width = Math.random() * 2 + 1; // Random width between 1 and 4
+                const height = width * 3; // Height proportional to width
+
+                drawFallingStar(x, y, speed, angle, width, height);
+            }, 800); // Generate new star every 0.8 seconds
+        }
+
+
+
+
+
+        // DRAW METEORITES ON SCREEN //
+        function drawFallingStar(x, y, speed, angle, width, height) {
+            const img = new Image();
+            img.src = 'img/sol/fugaz.webp';
+            img.onload = () => {
+                const vx = Math.cos(angle) * speed;
+                const vy = Math.sin(angle) * speed;
+
+                function animate() {
+                    backgroundCtx.clearRect(x, y, width, height);
+                    x += vx;
+                    y += vy;
+
+                    backgroundCtx.drawImage(img, x, y, width, height);
+
+                    // If star goes out of bounds, stop drawing it
+                    if (x < 0 || x > windowWidth || y > windowHeight) {
+                        return;
+                    }
+
+                    requestAnimationFrame(animate);
+                }
+                animate();
+            };
+        }
+
+
+
+
+        // DRAW SYSTEM SUN AND PLANETS //
+        function drawSolarSystem() {
+            solarSystemCtx.clearRect(0, 0, solarSystemCanvas.width, solarSystemCanvas.height);
+
+            solarSystemCtx.drawImage(sunTexture, sun.x - sun.radius, sun.y - sun.radius, sun.radius * 2, sun.radius * 2);
+
+            planets.forEach(planet => {
+                planet.angle += planet.speed;
+                const planetX = sun.x + planet.distance * Math.cos(planet.angle);
+                const planetY = sun.y + planet.distance * Math.sin(planet.angle);
+
+                solarSystemCtx.save();
+                solarSystemCtx.drawImage(planetTextures[planet.name], planetX - planet.radius, planetY - planet.radius, planet.radius * 2, planet.radius * 2);
+                solarSystemCtx.restore();
+
+                solarSystemCtx.font = '14px Arial';
+                if (currentPlanet === planet && !planet.isTopPlanet) {
+                    solarSystemCtx.fillStyle = mouseIsOverPlanet && spaceshipIsOverPlanet(planetX, planetY, planet.radius) ? 'red' : 'white';
+                } else if (planet.isTopPlanet) {
+                    solarSystemCtx.fillStyle = mouseIsOverPlanet && spaceshipIsOverPlanet(planetX, planetY, planet.radius) ? 'red' : 'green';
+                } else {
+                    solarSystemCtx.fillStyle = 'white';
+                }
+
+                if (planet.name == "Mass Relay") {
+                    solarSystemCtx.fillText(planet.name, planetX - 32, planetY - planet.radius + 13);
+                }
+                else if (planet.name == "Menae") {
+                    solarSystemCtx.fillText(planet.name, planetX - 22, planetY - planet.radius + 23);
+                }
+                else {
+                    solarSystemCtx.fillText(planet.name, planetX - 22, planetY - planet.radius - 10);
+                }
+            });
+
+            updateProjectiles();
+            animationId = requestAnimationFrame(drawSolarSystem);
+        }
+
+        solarSystemCanvas.addEventListener('mousemove', event => {
+            const rect = solarSystemCanvas.getBoundingClientRect();
+            const mouseX = event.clientX - rect.left;
+            const mouseY = event.clientY - rect.top;
+
+            mouseIsOverPlanet = false;
+            currentPlanet = null;
+
+            planets.forEach(planet => {
+                const planetX = sun.x + planet.distance * Math.cos(planet.angle);
+                const planetY = sun.y + planet.distance * Math.sin(planet.angle);
+                const distance = Math.sqrt((mouseX - planetX) ** 2 + (mouseY - planetY) ** 2);
+
+                if (distance < planet.radius) {
+                    mouseIsOverPlanet = true;
+                    currentPlanet = planet;
+                }
+
+            });
+        });
+
+
+
+
+        // DRAW SPACESHIP //
+        function drawSpaceship() {
+            spaceshipCtx.clearRect(0, 0, spaceshipCanvas.width, spaceshipCanvas.height);
+
+            if (isMouseDown) {
+                const dx = mouseX - spaceship.x;
+                const dy = mouseY - spaceship.y;
+                const distanceToTarget = Math.sqrt(dx * dx + dy * dy);
+
+                if (distanceToTarget > spaceship.speed) {
+                    const angle = Math.atan2(dy, dx);
+                    const vx = Math.cos(angle) * spaceship.speed;
+                    const vy = Math.sin(angle) * spaceship.speed;
+                    spaceship.x += vx;
+                    spaceship.y += vy;
+                    spaceship.direction = vx >= 0 ? 'right' : 'left';
+                } else {
+                    isMouseDown = false;
+                }
+            }
+
+            mouseIsOverPlanet = false;
+            planets.forEach(planet => {
+                const dx = spaceship.x - sun.x - planet.distance * Math.cos(planet.angle);
+                const dy = spaceship.y - sun.y - planet.distance * Math.sin(planet.angle);
+                const distance = Math.sqrt(dx * dx + dy * dy);
+
+                if (distance < planet.radius) {
+                    mouseIsOverPlanet = true;
+                    currentPlanet = planet;
+                }
+            });
+
+            if (!mouseIsOverPlanet) {
+                solarSystemCtx.fillStyle = 'white';
+            }
+
+            const dx = mouseX - spaceship.x;
+            const dy = mouseY - spaceship.y;
+            const angleToMouse = Math.atan2(dy, dx);
+
+            const spaceshipImg = angleToMouse > Math.PI / 2 || angleToMouse < -Math.PI / 2 ? spaceshipImgLeft : spaceshipImgRight;
+
+            spaceshipCtx.save();
+            spaceshipCtx.translate(spaceship.x, spaceship.y);
+            spaceshipCtx.rotate(angleToMouse);
+            spaceshipCtx.drawImage(spaceshipImg, -spaceshipWidth / 2, -spaceshipHeight / 2, spaceshipWidth, spaceshipHeight);
+            spaceshipCtx.restore();
+
+            requestAnimationFrame(drawSpaceship);
+        }
+
+
+
+        // SPACESHIP-PLANET INTERACTION //
+
+        function bestPlanets() {
+            const sortedPlanets = planets
+                .filter(planet => planet.name !== 'Mass Relay')
+                .sort((a, b) => b.totalResources - a.totalResources);
+
+            const topPlanets = sortedPlanets.slice(0, 3);
+
+            planets.forEach(planet => {
+                planet.isTopPlanet = topPlanets.includes(planet);
+            });
+        }
+
+
+
+        function spaceshipIsOverPlanet(planetX, planetY, planetRadius) {
+            const dx = spaceship.x - planetX;
+            const dy = spaceship.y - planetY;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+            return distance < planetRadius;
+        }
+
+
+
+
+        // PLANET FUNCTIONALITY MECHANICS //
+
+        // EXTRACT RESOURCES //
+        function extractResources(planet) {
+            let extractedElementZero = getRandomNumber(100, 200);
+            let extractedIridium = getRandomNumber(200, 500);
+            let extractedPlatinum = getRandomNumber(200, 500);
+            let extractedPalladium = getRandomNumber(200, 500);
+
+            if (extractedElementZero > planet.elementZero) {
+                extractedElementZero = planet.elementZero;
+            }
+            if (extractedIridium > planet.iridium) {
+                extractedIridium = planet.iridium;
+            }
+            if (extractedPlatinum > planet.platinum) {
+                extractedPlatinum = planet.platinum;
+            }
+            if (extractedPalladium > planet.palladium) {
+                extractedPalladium = planet.palladium;
+            }
+
+            // Transferir los recursos extraídos a la nave
+            spaceship.elementZero += extractedElementZero;
+            spaceship.iridium += extractedIridium;
+            spaceship.platinum += extractedPlatinum;
+            spaceship.palladium += extractedPalladium;
+
+            // Reducir los recursos del planeta
+            planet.elementZero -= extractedElementZero;
+            planet.iridium -= extractedIridium;
+            planet.platinum -= extractedPlatinum;
+            planet.palladium -= extractedPalladium;
+            planet.totalResources -= extractedElementZero + extractedIridium + extractedPlatinum + extractedPalladium
+        }
+
+        // PLANET PANEL //
+        function displayPlanetInfo(planet) {
+            const planetInfoPanel = document.getElementById('planetInfoPanel');
+            const planetImage = document.getElementById('planetImage');
+            const elementZero = document.getElementById('elementZero');
+            const iridium = document.getElementById('iridium');
+            const platinum = document.getElementById('platinum');
+            const palladium = document.getElementById('palladium');
+            const totalResources = document.getElementById('totalResources');
+            const spaceshipElementZero = document.getElementById('spaceshipElementZero');
+            const spaceshipIridium = document.getElementById('spaceshipIridium');
+            const spaceshipPlatinum = document.getElementById('spaceshipPlatinum');
+            const spaceshipPalladium = document.getElementById('spaceshipPalladium');
+
+            const extractionTime = 4000;
+            let extractionTimeout;
+
+            if (planet.name === 'Mass Relay') {
+                saveSpaceshipState();
+                window.location.href = 'galaxy.html';
+                return;
+            }
+
+            planetImage.src = planet.texture;
+
+            elementZero.textContent = planet.elementZero;
+            iridium.textContent = planet.iridium;
+            platinum.textContent = planet.platinum;
+            palladium.textContent = planet.palladium;
+            totalResources.textContent = planet.totalResources;
+
+            spaceshipElementZero.textContent = spaceship.elementZero;
+            spaceshipIridium.textContent = spaceship.iridium;
+            spaceshipPlatinum.textContent = spaceship.platinum;
+            spaceshipPalladium.textContent = spaceship.palladium;
+
+            planetInfoPanel.style.display = 'block';
+            overlay.style.display = 'block';
+
+            const closeButton = document.getElementById('closeButton');
+            closeButton.addEventListener('click', () => {
+                planetInfoPanel.style.display = 'none';
+                overlay.style.display = 'none';
+
+                planets.forEach((planet, index) => {
+                    planet.speed = originalSpeeds[index];
+                });
+            });
+
+            // Evento al hacer mousedown en la imagen del planeta
+            planetImage.addEventListener('mousedown', event => {
+                extractionTimeout = setTimeout(() => {
+                    extractResources(planet);
+
+                    // Actualizar visualización de recursos en el panel de información
+                    elementZero.textContent = planet.elementZero;
+                    iridium.textContent = planet.iridium;
+                    platinum.textContent = planet.platinum;
+                    palladium.textContent = planet.palladium;
+                    totalResources.textContent = planet.totalResources;
+
+                    spaceshipElementZero.textContent = spaceship.elementZero;
+                    spaceshipIridium.textContent = spaceship.iridium;
+                    spaceshipPlatinum.textContent = spaceship.platinum;
+                    spaceshipPalladium.textContent = spaceship.palladium;
+
+                    // Guardar estado actualizado del planeta con cookies
+                    savePlanetState(planet);
+
+                    // Guardar estado actualizado de la nave con cookies
+                    saveSpaceshipState();
+                }, extractionTime);
+
+                // Mostrar barra de progreso de extracción
+                const extractionProgressBar = document.getElementById('extractionProgressBar');
+                extractionProgressBar.style.width = '0%';
+                extractionProgressBar.style.transition = `width ${extractionTime}ms linear`;
+                setTimeout(() => {
+                    extractionProgressBar.style.width = '100%';
+                }, 10);
+            });
+
+            // Evento al hacer mouseup o salir del área de la imagen del planeta
+            planetImage.addEventListener('mouseup', () => {
+                clearTimeout(extractionTimeout);
+                const extractionProgressBar = document.getElementById('extractionProgressBar');
+                extractionProgressBar.style.width = '0%';
+                extractionProgressBar.style.transition = '';
+            });
+
+            planetImage.addEventListener('mouseleave', () => {
+                clearTimeout(extractionTimeout);
+                const extractionProgressBar = document.getElementById('extractionProgressBar');
+                extractionProgressBar.style.width = '0%';
+                extractionProgressBar.style.transition = '';
+            });
+        }
+
+
+
+        // PROJECTILE IMAGE SETUP //
+        const projectileImg = new Image();
+        projectileImg.src = 'img/energy-ball.png';
+
+
+        // PROJECTILE LOGIC //
+        function fireProjectile() {
+            const projectileSpeed = 10 + spaceship.speed;
+            const angle = Math.atan2(mouseY - spaceship.y, mouseX - spaceship.x);
+            const projectile = {
+                x: spaceship.x,
+                y: spaceship.y,
+                vx: Math.cos(angle) * projectileSpeed,
+                vy: Math.sin(angle) * projectileSpeed,
+                width: 10,
+                height: 10,
+            };
+            projectiles.push(projectile);
+        }
+
+
+        function drawProjectiles() {
+            projectiles.forEach(projectile => {
+                solarSystemCtx.drawImage(projectileImg, projectile.x - projectile.width / 2, projectile.y - projectile.height / 2, projectile.width, projectile.height);
+            });
+        }
+
+
+        function updateProjectiles() {
+            projectiles.forEach((projectile, index) => {
+                projectile.x += projectile.vx;
+                projectile.y += projectile.vy;
+
+                if (reaper) {
+                    // Check collision with Reaper
+                    const dx = projectile.x - reaper.x;
+                    const dy = projectile.y - reaper.y;
+                    const distance = Math.sqrt(dx * dx + dy * dy);
+
+                    if (distance < reaper.width / 2) {
+                        // Remove projectile
+                        projectiles.splice(index, 1);
+                        // Stun Reaper
+                        stunReaper();
+                    }
+                }
+
+                // Remove the projectile if it goes off screen
+                if (projectile.x < 0 || projectile.x > windowWidth || projectile.y < 0 || projectile.y > windowHeight) {
+                    projectiles.splice(index, 1);
+                }
+            });
+
+            drawProjectiles();
+        }
+
+
+
+
+
+
+
+
+
+
+
+        ////////////////////////////////// REAPER MECHANICS //////////////////////////////////
+        const reaperImgRight = new Image();
+        reaperImgRight.src = 'img/reaperDER.webp';
+
+        const reaperImgLeft = new Image();
+        reaperImgLeft.src = 'img/reaperIZQ.webp';
+
+        let reaper;
+        const reaperCount = 1;
+        let threatMeter = 0;
+        const threatMeterMax = 100;
+        let threatInterval;
+        let gameOver = false;
+
+        let reaperStunned = false;
+        let stunTimeout;
+
+
+        const reaperTimerBar = document.getElementById('reaperTimerBar');
+        const reaperTimerFill = document.getElementById('reaperTimerFill');
+        let reaperContactStartTime = null;
+
+
+        // Create a single Reaper object
+        function createReaper() {
+            reaper = {
+                x: Math.random() * (spaceshipCanvas.width - 20) + 10,
+                y: Math.random() * (spaceshipCanvas.height - 20) + 10,
+                width: 50,
+                height: 50,
+                speed: 1,
+            };
+        }
+
+
+        // Move and draw the Reaper towards the spaceship
+        function moveAndDrawReaper() {
+            reaperCtx.clearRect(0, 0, reaperCanvas.width, reaperCanvas.height);
+
+            const dx = spaceship.x - reaper.x;
+            const dy = spaceship.y - reaper.y;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+
+            if (distance > reaper.speed) {
+                const angle = Math.atan2(dy, dx);
+                const vx = Math.cos(angle) * reaper.speed;
+                const vy = Math.sin(angle) * reaper.speed;
+
+                reaper.x += vx;
+                reaper.y += vy;
+
+            } else {
+                reaper.x = spaceship.x;
+                reaper.y = spaceship.y;
+
+            }
+
+            const angleToShip = Math.atan2(dy, dx);
+
+            const reaperImg = angleToShip > Math.PI / 2 || angleToShip < -Math.PI / 2 ? reaperImgLeft : reaperImgRight;
+
+            reaperCtx.save();
+            reaperCtx.translate(reaper.x, reaper.y);
+
+
+            reaperCtx.drawImage(reaperImg, -reaper.width / 2, -reaper.height / 2, reaper.width, reaper.height);
+            reaperCtx.restore();
+
+            // Check for collision
+            if (distance < reaper.width) {
+                checkGameOver();
+            }
+
+            // Continuar dibujando y moviendo el Reaper en cada fotograma
+            if (!gameOver) {
+                requestAnimationFrame(moveAndDrawReaper);
+            }
+
+            if (!reaperStunned) {
+                const dx = spaceship.x - reaper.x;
+                const dy = spaceship.y - reaper.y;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+
+                if (distance > reaper.speed) {
+                    const angle = Math.atan2(dy, dx);
+                    const vx = Math.cos(angle) * reaper.speed;
+                    const vy = Math.sin(angle) * reaper.speed;
+
+                    reaper.x += vx;
+                    reaper.y += vy;
+
+                } else {
+                    reaper.x = spaceship.x;
+                    reaper.y = spaceship.y;
+                }
+
+                const angleToShip = Math.atan2(dy, dx);
+
+                const reaperTimerBar = document.getElementById('reaperTimerBar');
+                reaperTimerBar.style.left = `${reaper.x}px`;
+                reaperTimerBar.style.top = `${reaper.y + reaper.height / 2 + 10}px`;
+
+
+                const reaperImg = angleToShip > Math.PI / 2 || angleToShip < -Math.PI / 2 ? reaperImgLeft : reaperImgRight;
+
+                reaperCtx.save();
+                reaperCtx.translate(reaper.x, reaper.y);
+                reaperCtx.drawImage(reaperImg, -reaper.width / 2, -reaper.height / 2, reaper.width, reaper.height);
+                reaperCtx.restore();
+
+
+                // Check for collision
+                if (distance < reaper.width) {
+                    checkGameOver();
+                }
+            } else {
+
+                const reaperTimerBar = document.getElementById('reaperTimerBar');
+                reaperTimerBar.style.left = `${reaper.x}px`;
+                reaperTimerBar.style.top = `${reaper.y + reaper.height / 2 + 10}px`;
+
+                reaperCtx.drawImage(reaper.img, reaper.x - reaper.width / 2, reaper.y - reaper.height / 2, reaper.width, reaper.height);
+
+            }
+        }
+
+
+        function stunReaper() {
+            let stunDuration;
+            switch (spaceship.weapon) {
+                case 1:
+                    stunDuration = 1000; // 0.5 seconds
+                    break;
+                case 2:
+                    stunDuration = 1500; // 1 second
+                    break;
+                case 3:
+                    stunDuration = 3000; // 1.5 seconds
+                    break;
+                default:
+                    stunDuration = 0;
+            }
+
+            reaperStunned = true;
+            clearTimeout(stunTimeout);
+
+            stunTimeout = setTimeout(() => {
+                reaperStunned = false;
+            }, stunDuration);
+        }
+
+        // Check if the Reaper is over the spaceship for more than 1 second
+        function checkGameOver() {
+            let startTime = Date.now();
+
+            const check = () => {
+                const dx = spaceship.x - reaper.x;
+                const dy = spaceship.y - reaper.y;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                if (distance < reaper.width) {
+                    if (reaperContactStartTime === null) {
+                        reaperContactStartTime = Date.now();
+                    }
+                    const elapsedTime = Date.now() - reaperContactStartTime;
+                    const fillPercentage = Math.min(elapsedTime / (1000 + spaceship.shield), 1);
+                    reaperTimerFill.style.width = fillPercentage * 100 + '%';
+
+                    if (elapsedTime > 1000 + spaceship.shield) {
+                        triggerGameOver();
+                    } else {
+                        requestAnimationFrame(check);
+                    }
+                } else {
+                    reaperContactStartTime = null;
+                    reaperTimerFill.style.width = '0%';
+                    requestAnimationFrame(check);
+                }
+            };
+
+            check();
+        }
+
+
+        // Trigger game over
+        function triggerGameOver() {
+            gameOver = true;
+            spaceship.speed = 0;
+
+            // Add the fade-out class to the body
+            document.body.classList.add('fade-out');
+
+            // Redirect to gameover.html after the fade-out animation
+            setTimeout(() => {
+                window.location.href = 'gameover.html';
+            }, 1000); // 1 second (1000ms) to match the CSS animation duration
+        }
+
+
+        // Increase threat meter
+        function increaseThreatMeter() {
+            threatMeter += 10;
+            const threatMeterFill = document.getElementById('threatMeterFill');
+            const maxWidthPercentage = 100;
+            threatMeterFill.style.width = `${Math.min((threatMeter / threatMeterMax) * 100, maxWidthPercentage)}%`;
+            if (threatMeter >= threatMeterMax) {
+                spawnReaper();
+                clearInterval(threatInterval);
+            }
+        }
+
+        // Spawn Reaper
+        function spawnReaper() {
+            createReaper();
+            moveAndDrawReaper();
+
+            // Gradually increase Reaper speed over time
+            setInterval(() => {
+                reaper.speed += 0.05; // Adjust the speed increment as needed
+            }, 1000); // Adjust the interval duration as needed
+        }
+
+
+        // Start threat meter interval
+        threatInterval = setInterval(() => {
+            if (!gameOver) {
+                increaseThreatMeter();
+            }
+        }, 5000 + spaceship.stealth
+        );
+
+
+    </script>
+</body>
+
+</html>

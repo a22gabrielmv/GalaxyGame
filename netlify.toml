@@ -2,6 +2,6 @@
   functions = "functions"
 
 [[redirects]]
-  from = "/gamestart"
+  from = "/"
   to = "/gamestart.html"
   status = 200

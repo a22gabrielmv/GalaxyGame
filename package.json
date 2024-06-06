@@ -1,11 +1,12 @@
 {
   "name": "universe",
   "version": "1.0.0",
-  "main": "database.mongodb.js",
+  "main": "functions/server.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "build": "netlify deploy --prod",
-    "start": "node functions/server.js"
+    "start": "node functions/server.js",
+    "dev": "netlify dev"
   },
   "keywords": [],
   "author": "",
@@ -16,7 +17,6 @@
     "express": "^4.19.2",
     "mongodb": "^6.6.2",
     "netlify-cli": "^17.26.0",
-    "netlify-lambda": "^2.0.16",
     "serverless-http": "^3.2.0"
   }
 }

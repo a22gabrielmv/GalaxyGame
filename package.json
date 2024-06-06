@@ -5,8 +5,8 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "node server.js",
-    "build": "netlify deploy --prod"
-    "start": "node functions/server.js"
+    "build": "netlify deploy --prod",
+    "start": "node functions/server.js",
   },
   "keywords": [],
   "author": "",

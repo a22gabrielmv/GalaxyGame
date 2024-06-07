@@ -2,6 +2,6 @@
   functions = "functions"
 
 [[redirects]]
-  from = "/*"
-  to = "/.netlify/functions/server"
+  from = "/"
+  to = "/functions/redirect-to-gamestart"
   status = 200

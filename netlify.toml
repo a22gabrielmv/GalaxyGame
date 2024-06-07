@@ -3,5 +3,5 @@
 
 [[redirects]]
   from = "/"
-  to = "/gamestart.html"
+  to = "/.netlify/functions/server/gamestart"
   status = 200

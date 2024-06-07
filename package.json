@@ -4,9 +4,7 @@
   "main": "functions/server.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "build": "netlify deploy --prod",
-    "start": "node functions/server.js",
-    "dev": "netlify dev"
+    "serve": "netlify functions:serve"
   },
   "keywords": [],
   "author": "",
@@ -16,7 +14,10 @@
     "cors": "^2.8.5",
     "express": "^4.19.2",
     "mongodb": "^6.6.2",
-    "netlify-cli": "^17.26.0",
+    "netlify": "^13.1.17",
     "serverless-http": "^3.2.0"
+  },
+  "devDependencies": {
+    "netlify-cli": "^17.26.0"
   }
 }

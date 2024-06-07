@@ -4,7 +4,8 @@
   "main": "functions/server.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "serve": "netlify functions:serve"
+    "build": "netlify deploy --prod",
+    "start": "node functions/server.js"
   },
   "keywords": [],
   "author": "",

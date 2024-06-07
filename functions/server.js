@@ -1,7 +1,7 @@
 const express = require('express');
 const { MongoClient } = require('mongodb');
 const cors = require('cors');
-const serverless = require("serverless-http");
+const serverless = require('serverless-http');
 const path = require('path');
 
 const app = express();
@@ -11,70 +11,81 @@ const url = 'mongodb+srv://userdb:abc123.@clustergalaxy.hdklzaq.mongodb.net/?ret
 const dbName = 'galaxy';
 let db;
 
-MongoClient.connect(url, { useNewUrlParser: true, useUnifiedTopology: true })
-    .then(client => {
+// Conectar a MongoDB
+async function connectToDatabase() {
+    try {
+        const client = await MongoClient.connect(url, { useNewUrlParser: true, useUnifiedTopology: true });
         db = client.db(dbName);
         console.log('Connected to database');
-    })
-    .catch(error => {
+    } catch (error) {
         console.error('Error connecting to database:', error);
         process.exit(1); // Exit if unable to connect to the database
-    });
+    }
+}
+
+// Llama a la función de conexión cuando la aplicación se inicia
+connectToDatabase();
 
 // Habilita CORS
 app.use(cors());
 
-router.get("/", (req, res) => {
-    res.send("App is running..");
+// Ruta raíz para verificar que la aplicación está funcionando
+router.get('/', (req, res) => {
+    res.send('App is running..');
 });
 
-// Endpoint para obtener los sistemas estelares
-router.get('/systems', (req, res) => {
-    const collection = db.collection('system');
-    collection.find({}).toArray()
-        .then(systems => res.json(systems))
-        .catch(error => res.status(500).send(error));
-});
-
-// Endpoint para obtener los planetas del sistema 'solar-cluster'
-router.get('/planets/solar-cluster', (req, res) => {
-    const collection = db.collection('planet');
-    collection.find({ system: 'solar-cluster' }).toArray()
-        .then(planets => res.json(planets))
-        .catch(error => res.status(500).send(error));
-});
-
-// Endpoint para obtener los planetas del sistema 'trebia-cluster'
-router.get('/planets/trebia-cluster', (req, res) => {
-    const collection = db.collection('planet');
-    collection.find({ system: 'trebia-cluster' }).toArray()
-        .then(planets => res.json(planets))
-        .catch(error => res.status(500).send(error));
-});
-
-// Endpoint para obtener los planetas del sistema 'citadel-cluster'
-router.get('/planets/citadel-cluster', (req, res) => {
-    const collection = db.collection('planet');
-    collection.find({ system: 'citadel-cluster' }).toArray()
-        .then(planets => res.json(planets))
-        .catch(error => res.status(500).send(error));
-});
-
-// Endpoint para cargar la página de inicio
-router.get('/gamestart', (req, res) => {
-    res.sendFile(path.join(__dirname, 'gamestart.html'));
-});
-
-// Define una ruta para redirigir a gamestart.html
-router.get("/redirect-to-gamestart", (req, res) => {
+// Endpoint para redirigir a `gamestart.html` después de la conexión a la base de datos
+router.get('/redirect-to-gamestart', (req, res) => {
     if (db) {
-        // Si la base de datos está conectada, redirige a gamestart.html
-        res.sendFile(path.join(__dirname, 'gamestart.html'));
+        res.sendFile(path.join(__dirname, '../gamestart.html'));
     } else {
         res.status(500).send('Database connection not established.');
     }
 });
 
-app.use("/.netlify/functions/server", router);
+// Define otras rutas
+router.get('/systems', async (req, res) => {
+    try {
+        const collection = db.collection('system');
+        const systems = await collection.find({}).toArray();
+        res.json(systems);
+    } catch (error) {
+        res.status(500).send(error);
+    }
+});
 
+router.get('/planets/solar-cluster', async (req, res) => {
+    try {
+        const collection = db.collection('planet');
+        const planets = await collection.find({ system: 'solar-cluster' }).toArray();
+        res.json(planets);
+    } catch (error) {
+        res.status(500).send(error);
+    }
+});
+
+router.get('/planets/trebia-cluster', async (req, res) => {
+    try {
+        const collection = db.collection('planet');
+        const planets = await collection.find({ system: 'trebia-cluster' }).toArray();
+        res.json(planets);
+    } catch (error) {
+        res.status(500).send(error);
+    }
+});
+
+router.get('/planets/citadel-cluster', async (req, res) => {
+    try {
+        const collection = db.collection('planet');
+        const planets = await collection.find({ system: 'citadel-cluster' }).toArray();
+        res.json(planets);
+    } catch (error) {
+        res.status(500).send(error);
+    }
+});
+
+// Usar el router en la ruta de funciones de Netlify
+app.use('/.netlify/functions/server', router);
+
+// Exportar la aplicación como una función serverless
 module.exports.handler = serverless(app);

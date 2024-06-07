@@ -2,6 +2,6 @@
   functions = "functions"
 
 [[redirects]]
-  from = "/"
-  to = "/functions/server.js"
+  from = "/*"
+  to = "/.netlify/functions/server"
   status = 200

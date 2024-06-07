@@ -17,6 +17,10 @@ async function connectToDatabase() {
         const client = await MongoClient.connect(url, { useNewUrlParser: true, useUnifiedTopology: true });
         db = client.db(dbName);
         console.log('Connected to database');
+        // Redirige a /gamestart.html después de la conexión exitosa
+        app.get('/gamestart', (req, res) => {
+            res.sendFile(path.join(__dirname, 'gamestart.html'));
+        });
     } catch (error) {
         console.error('Error connecting to database:', error);
         process.exit(1); // Exit if unable to connect to the database
@@ -34,53 +38,48 @@ router.get('/', (req, res) => {
     res.send('App is running..');
 });
 
-// Endpoint para redirigir a `gamestart.html` después de la conexión a la base de datos
-router.get('/redirect-to-gamestart', (req, res) => {
-    if (db) {
-        res.sendFile(path.join(__dirname, 'gamestart.html'));
-    } else {
-        res.status(500).send('Database connection not established.');
-    }
-});
-
 // Define otras rutas
 router.get('/systems', async (req, res) => {
     try {
+        if (!db) throw new Error('Database not initialized');
         const collection = db.collection('system');
         const systems = await collection.find({}).toArray();
         res.json(systems);
     } catch (error) {
-        res.status(500).send(error);
+        res.status(500).send({ error: error.message });
     }
 });
 
 router.get('/planets/solar-cluster', async (req, res) => {
     try {
+        if (!db) throw new Error('Database not initialized');
         const collection = db.collection('planet');
         const planets = await collection.find({ system: 'solar-cluster' }).toArray();
         res.json(planets);
     } catch (error) {
-        res.status(500).send(error);
+        res.status(500).send({ error: error.message });
     }
 });
 
 router.get('/planets/trebia-cluster', async (req, res) => {
     try {
+        if (!db) throw new Error('Database not initialized');
         const collection = db.collection('planet');
         const planets = await collection.find({ system: 'trebia-cluster' }).toArray();
         res.json(planets);
     } catch (error) {
-        res.status(500).send(error);
+        res.status(500).send({ error: error.message });
     }
 });
 
 router.get('/planets/citadel-cluster', async (req, res) => {
     try {
+        if (!db) throw new Error('Database not initialized');
         const collection = db.collection('planet');
         const planets = await collection.find({ system: 'citadel-cluster' }).toArray();
         res.json(planets);
     } catch (error) {
-        res.status(500).send(error);
+        res.status(500).send({ error: error.message });
     }
 });
 

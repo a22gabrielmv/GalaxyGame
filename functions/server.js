@@ -37,7 +37,7 @@ router.get('/', (req, res) => {
 // Endpoint para redirigir a `gamestart.html` después de la conexión a la base de datos
 router.get('/redirect-to-gamestart', (req, res) => {
     if (db) {
-        res.sendFile(path.join(__dirname, '../gamestart.html'));
+        res.sendFile(path.join(__dirname, 'gamestart.html'));
     } else {
         res.status(500).send('Database connection not established.');
     }
